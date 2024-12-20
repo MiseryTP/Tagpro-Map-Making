@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wall Generator</title>
+    <style>
+        #canvas2 {
+            display: none;
+        }
+
+        #mapCanvas {
+            border: 2px solid #333;
+            margin-top: 20px;
+            display: block;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background-color: #f4f4f4;
+            color: #333;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            gap: 30px;
+        }
+
+        .controls {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            max-width: 250px;
+            margin-top: 20px;
+        }
+
+        .slider-container {
+            margin: 10px 0;
+            width: 100%;
+        }
+
+        .slider-container label {
+            font-size: 1em;
+            margin-bottom: 5px;
+            text-align: center;
+        }
+
+        .slider-container .slider {
+            width: 100%;
+            margin: 5px 0;
+        }
+
+        .value-display {
+            font-size: 0.9em;
+            color: #555;
+        }
+
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            margin: 8px 0;
+            cursor: pointer;
+            font-size: 1em;
+            border-radius: 5px;
+            transition: background-color 0.3s ease;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        button:active {
+            background-color: #003f7f;
+        }
+
+        .button-container {
+            margin-top: 20px;
+        }
+
+        #github-button {
+            position: fixed;
+            bottom: 20px; 
+            right: 20px; 
+            z-index: 9999;
+            text-decoration: none;
+        }
+
+        #github-button img {
+            max-width: 150px;
+            height: auto;
+        }
+    </style>
+</head>
+<body>
+    <a href="https://github.com/BambiTP/BuildAMapWorkshop" id="github-button" target="_blank">
+        <img src="https://img.shields.io/badge/BuildAMapWorkshop-GitHub-blue?logo=github&logoColor=white" alt="GitHub" />
+    </a>
+    <div>
+        <canvas id="mapCanvas" width="450" height="450"></canvas>
+    </div>
+
+    <div class="controls">
+        <div class="slider-container">
+            <label for="sizexInput">Size X (Width):</label>
+            <input type="number" id="sizexInput" class="slider" min="1" max="100" value="45" step="2">
+        </div>
+        <div class="slider-container">
+            <label for="sizeyInput">Size Y (Height):</label>
+            <input type="number" id="sizeyInput" class="slider" min="1" max="100" value="45" step="2">
+        </div>
+        <div class="slider-container">
+            <label for="randLeftSlider">randLeft (0 to 1):</label>
+            <input type="range" id="randLeftSlider" class="slider" min="0" max="100" step="1" value="50">
+            <div class="value-display">Current Left Up%: <span id="randLeftValue">0.5</span></div>
+        </div>
+        <div class="slider-container">
+            <label for="randRightSlider">randRight (0 to 1):</label>
+            <input type="range" id="randRightSlider" class="slider" min="0" max="100" step="1" value="50">
+            <div class="value-display">Current Right Up%: <span id="randRightValue">0.5</span></div>
+        </div>
+        <div class="slider-container">
+            <label for="rand45sSlider">rand45s (0 to 1):</label>
+            <input type="range" id="rand45sSlider" class="slider" min="0" max="100" step="1" value="50">
+            <div class="value-display">Current 45 chance: <span id="rand45sValue">0.5</span></div>
+        </div>
+
+        <div class="button-container">
+            <button id="Walls" onclick="generateWalls(sizex, sizey)">Walls</button>
+            <button onclick="Random45s(grid)">45's</button>
+            <button onclick="json()">Download JSON</button>
+            <button onclick="png(grid)">Download PNG</button>
+        </div>
+    </div>
+</body>
+</html>
+
+<script>
+const tileColors = [
+    { id: 0, rgb: [0, 0, 0] },
+    { id: 1, rgb: [120, 120, 120] },
+    { id: 2, rgb: [212, 212, 212] },
+    { id: 3, rgb: [255, 128, 0] },
+    { id: 4, rgb: [255, 115, 115] },
+    { id: 5, rgb: [115, 115, 255] },
+    { id: 6, rgb: [255, 255, 0] },
+    { id: 7, rgb: [220, 186, 186] },
+    { id: 8, rgb: [187, 184, 221] },
+    { id: 9, rgb: [220, 220, 186] },
+    { id: 10, rgb: [255, 0, 0] },
+    { id: 11, rgb: [0, 0, 255] },
+    { id: 12, rgb: [128, 128, 0] },
+    { id: 13, rgb: [0, 255, 0] },
+    { id: 14, rgb: [128, 64, 112] },
+    { id: 15, rgb: [128, 112, 64] },
+    { id: 16, rgb: [64, 80, 128] },
+    { id: 17, rgb: [64, 128, 80] },
+    { id: 18, rgb: [255, 0, 255] }, // Obstacle (Power-up / Block)
+    { id: 19, rgb: [0, 255, 255] }, // Power-up (Boost)
+];
+
+let r45 = 0.5;
+let randRight = 0.5;
+let randLeft = 0.5;
+let sizex = 45;
+let sizey = 45;
+let grid = Array(sizey).fill().map(() => Array(sizex).fill(0));
+let obstacles = [];
+let powerUps = [];
+
+function generateWalls(sizex, sizey) {
+    grid = Array(sizey).fill().map(() => Array(sizex).fill(0));
+    obstacles = [];
+    powerUps = [];
+    const canvas = document.getElementById('mapCanvas');
+    const ctx = canvas.getContext('2d');
+    const tileSize = 10;
+
+    // Randomly place obstacles and power-ups
+    placeObstacles(sizex, sizey);
+    placePowerUps(sizex, sizey);
+
+    // Render the grid with obstacles and power-ups
+    renderGrid(grid, sizex, sizey, ctx, tileSize);
+}
+
+function placeObstacles(sizex, sizey) {
+    const numObstacles = Math.floor(sizex * sizey * 0.05); // 5% of grid cells for obstacles
+    for (let i = 0; i < numObstacles; i++) {
+        const x = Math.floor(Math.random() * sizex);
+        const y = Math.floor(Math.random() * sizey);
+        if (grid[y][x] === 0) { // Avoid placing obstacles where there's already a wall
+            grid[y][x] = 18; // Place an obstacle
+            obstacles.push({ x, y });
+        }
+    }
+}
+
+function placePowerUps(sizex, sizey) {
+    const numPowerUps = Math.floor(sizex * sizey * 0.03); // 3% of grid cells for power-ups
+    for (let i = 0; i < numPowerUps; i++) {
+        const x = Math.floor(Math.random() * sizex);
+        const y = Math.floor(Math.random() * sizey);
+        if (grid[y][x] === 0) {
+            grid[y][x] = 19; // Place a power-up
+            powerUps.push({ x, y });
+        }
+    }
+}
+
+function renderGrid(grid, sizex, sizey, ctx, tileSize) {
+    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+
+    for (let y = 0; y < sizey; y++) {
+        for (let x = 0; x < sizex; x++) {
+            const tile = tileColors.find(t => t.id === grid[y][x]);
+            if (tile) {
+                ctx.fillStyle = `rgb(${tile.rgb.join(',')})`;
+                ctx.fillRect(x * tileSize, y * tileSize, tileSize, tileSize);
+            }
+        }
+    }
+}
+
+function Random45s(grid) {
+    // 45 degree rotation handling
+    // Your implementation for generating the 45's
+}
+
+function json() {
+    // Logic for downloading grid as JSON
+}
+
+function png(grid) {
+    // Logic for downloading grid as PNG
+}
+</script>
